@@ -1,8 +1,23 @@
-# Social App
+# Social Media App
 
 A LinkedIn/Twitter-style social platform built as a placement portfolio project,
 using the **Next.js 14 App Router** for both the frontend and the backend
 (no separate Express server).
+
+## Why I Built This
+
+I built this project as placement portfolio to learn modern full-stack web development 
+with Next.js 14, TypeScript, Prisma, PostgreSQL, and NextAuth. The goal is to build a 
+production-style social media application step by step while gaining practical 
+experience with authentication, databases, API development, and scalable application 
+architecture.
+
+## Project Status
+
+✅ Phase 0 – Project Setup (Completed)
+
+🚧 Currently Working On:
+- Phase 1 – Authentication + Databasegi
 
 ## Tech Stack
 
@@ -78,9 +93,13 @@ Visit [http://localhost:3000](http://localhost:3000).
 
 ## Why there's no `server.js` / Express app
 
-See the explanation in the project write-up — in short, `/app/api/**/route.ts`
-files are serverless-style route handlers that Next.js compiles and deploys
-as backend endpoints, so App Router *is* the backend here.
+This project uses the **Next.js App Router**, which allows frontend pages and backend 
+API routes to live in the same application. Files inside `/app/api/**/route.ts` act as 
+API Route Handlers that Next.js compiles into backend endpoints.
+
+Because of this, a separate Express server isn't required for this project. The App 
+Router provides routing, API handling, server-side rendering, and backend logic within 
+a single codebase.
 
 ## Data Model
 
