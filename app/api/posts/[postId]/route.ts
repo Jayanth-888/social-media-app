@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { auth } from "@/auth";
 import { db } from "@/lib/db";
 import type { ApiResponse } from "@/types";
 
@@ -15,7 +14,7 @@ export async function GET(_req: NextRequest, { params }: RouteParams) {
   const post = await db.post.findUnique({
     where: { id: params.postId },
     include: {
-      author: { select: { id: true, name: true, username: true, image: true, headline: true } },
+      author: { select: { id: true, name: true, profileImage: true, headline: true } },
       _count: { select: { likes: true, comments: true } },
     },
   });
@@ -31,7 +30,7 @@ export async function GET(_req: NextRequest, { params }: RouteParams) {
 }
 
 export async function DELETE(_req: NextRequest, { params }: RouteParams) {
-  const session = await getServerSession(authOptions);
+  const session = await auth();
   if (!session?.user) {
     return NextResponse.json<ApiResponse<null>>(
       { success: false, error: "Unauthorized" },
@@ -46,7 +45,7 @@ export async function DELETE(_req: NextRequest, { params }: RouteParams) {
       { status: 404 }
     );
   }
-  if (post.authorId !== (session.user as { id: string }).id) {
+  if (post.authorId !== session.user.id) {
     return NextResponse.json<ApiResponse<null>>(
       { success: false, error: "Forbidden" },
       { status: 403 }

@@ -1,29 +1,30 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
 import { z } from "zod";
-import { authOptions } from "@/lib/auth";
+import { auth } from "@/auth";
 import { db } from "@/lib/db";
 import type { ApiResponse, Post } from "@/types";
 
 // GET /api/posts  -> returns the feed
 // This replaces an Express route like: router.get("/posts", getFeed)
 export async function GET() {
-  const session = await getServerSession(authOptions);
-  const viewerId = session?.user ? (session.user as { id: string }).id : null;
+  const session = await auth();
+  const viewerId = session?.user?.id ?? null;
 
   const posts = await db.post.findMany({
     orderBy: { createdAt: "desc" },
     take: 50,
     include: {
       author: {
-        select: { id: true, name: true, username: true, image: true, headline: true },
+        select: { id: true, name: true, profileImage: true, headline: true },
       },
       _count: { select: { likes: true, comments: true } },
       likes: viewerId ? { where: { userId: viewerId }, select: { id: true } } : false,
     },
   });
 
-  const data: Post[] = posts.map((p) => ({
+  type PostWithRelations = (typeof posts)[number];
+
+  const data: Post[] = posts.map((p: PostWithRelations) => ({
     id: p.id,
     content: p.content,
     imageUrl: p.imageUrl,
@@ -45,7 +46,7 @@ const createPostSchema = z.object({
 // POST /api/posts -> creates a new post
 // This replaces an Express route like: router.post("/posts", authMiddleware, createPost)
 export async function POST(req: NextRequest) {
-  const session = await getServerSession(authOptions);
+  const session = await auth();
   if (!session?.user) {
     return NextResponse.json<ApiResponse<null>>(
       { success: false, error: "Unauthorized" },
@@ -66,10 +67,10 @@ export async function POST(req: NextRequest) {
     data: {
       content: parsed.data.content,
       imageUrl: parsed.data.imageUrl,
-      authorId: (session.user as { id: string }).id,
+      authorId: session.user.id,
     },
     include: {
-      author: { select: { id: true, name: true, username: true, image: true, headline: true } },
+      author: { select: { id: true, name: true, profileImage: true, headline: true } },
     },
   });
 

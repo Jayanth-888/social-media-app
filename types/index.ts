@@ -5,13 +5,10 @@
 export interface UserProfile {
   id: string;
   name: string | null;
-  username: string;
   email: string;
-  image: string | null;
+  profileImage: string | null;
   bio: string | null;
   headline: string | null;
-  location: string | null;
-  website: string | null;
   createdAt: string;
   followersCount: number;
   followingCount: number;
@@ -22,8 +19,7 @@ export interface UserProfile {
 export interface PostAuthor {
   id: string;
   name: string | null;
-  username: string;
-  image: string | null;
+  profileImage: string | null;
   headline: string | null;
 }
 

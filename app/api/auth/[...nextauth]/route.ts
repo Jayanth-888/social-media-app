@@ -1,9 +1,8 @@
-import NextAuth from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { handlers } from "@/auth";
 
-// This single file handles ALL auth routes: /api/auth/signin, /api/auth/callback,
-// /api/auth/session, /api/auth/signout, etc. The [...nextauth] folder name
-// is a "catch-all" dynamic segment — it captures every sub-path after /api/auth/.
-const handler = NextAuth(authOptions);
-
-export { handler as GET, handler as POST };
+// Auth.js v5 pre-builds the GET/POST handlers for you (sign-in, callback,
+// session, sign-out, csrf, etc.) — this file just re-exports them.
+// Compare to v4, where you had to call NextAuth(authOptions) here directly;
+// in v5 that call happens once in auth.ts so both this route AND
+// middleware.ts can share the exact same config.
+export const { GET, POST } = handlers;

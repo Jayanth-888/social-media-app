@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
 import { z } from "zod";
-import { authOptions } from "@/lib/auth";
+import { auth } from "@/auth";
 import { db } from "@/lib/db";
 import type { ApiResponse } from "@/types";
 
@@ -9,7 +8,7 @@ const toggleLikeSchema = z.object({ postId: z.string().min(1) });
 
 // POST /api/likes -> toggles a like on a post for the current user
 export async function POST(req: NextRequest) {
-  const session = await getServerSession(authOptions);
+  const session = await auth();
   if (!session?.user) {
     return NextResponse.json<ApiResponse<null>>(
       { success: false, error: "Unauthorized" },
@@ -26,7 +25,7 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const userId = (session.user as { id: string }).id;
+  const userId = session.user.id;
   const { postId } = parsed.data;
 
   const existing = await db.like.findUnique({
