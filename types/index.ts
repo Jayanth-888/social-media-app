@@ -36,10 +36,23 @@ export interface Post {
 
 export interface Comment {
   id: string;
-  content: string;
+  text: string;
   createdAt: string;
   author: PostAuthor;
   postId: string;
+  parentId: string | null;
+  likesCount: number;
+  isLikedByViewer: boolean;
+  // Only present on top-level comments as returned by GET /api/posts/[id]/comment.
+  // A reply's own `replies` is always undefined — threads are kept one level deep.
+  replies?: Comment[];
+}
+
+// Shape returned by GET /api/posts?cursor=... — the cursor is the id of the
+// last post in the current page, or null once there are no more pages.
+export interface PaginatedPosts {
+  posts: Post[];
+  nextCursor: string | null;
 }
 
 export interface CreatePostInput {
@@ -48,8 +61,7 @@ export interface CreatePostInput {
 }
 
 export interface CreateCommentInput {
-  content: string;
-  postId: string;
+  text: string;
 }
 
 // Generic API response envelope used by every route handler in /app/api

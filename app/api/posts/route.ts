@@ -2,40 +2,40 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
-import type { ApiResponse, Post } from "@/types";
+import { postSelect, serializePost } from "@/lib/posts";
+import type { ApiResponse, Post, PaginatedPosts } from "@/types";
 
-// GET /api/posts  -> returns the feed
-// This replaces an Express route like: router.get("/posts", getFeed)
-export async function GET() {
+const PAGE_SIZE = 10;
+
+// GET /api/posts?cursor=<postId> -> cursor-paginated feed, newest first.
+// Cursor pagination (rather than ?page=N/offset) stays correct even as new
+// posts are inserted between requests, and scales better than OFFSET on a
+// large table since Postgres can seek directly from the indexed createdAt/id
+// instead of counting through skipped rows.
+export async function GET(req: NextRequest) {
   const session = await auth();
   const viewerId = session?.user?.id ?? null;
 
+  const cursor = req.nextUrl.searchParams.get("cursor");
+
   const posts = await db.post.findMany({
+    take: PAGE_SIZE + 1, // fetch one extra to know if there's a next page
+    ...(cursor ? { skip: 1, cursor: { id: cursor } } : {}),
     orderBy: { createdAt: "desc" },
-    take: 50,
-    include: {
-      author: {
-        select: { id: true, name: true, profileImage: true, headline: true },
-      },
-      _count: { select: { likes: true, comments: true } },
-      likes: viewerId ? { where: { userId: viewerId }, select: { id: true } } : false,
-    },
+    select: postSelect(viewerId),
   });
 
-  type PostWithRelations = (typeof posts)[number];
+  const hasMore = posts.length > PAGE_SIZE;
+  const page = hasMore ? posts.slice(0, PAGE_SIZE) : posts;
+  const nextCursor = hasMore ? page[page.length - 1].id : null;
 
-  const data: Post[] = posts.map((p: PostWithRelations) => ({
-    id: p.id,
-    content: p.content,
-    imageUrl: p.imageUrl,
-    createdAt: p.createdAt.toISOString(),
-    author: p.author,
-    likesCount: p._count.likes,
-    commentsCount: p._count.comments,
-    isLikedByViewer: viewerId ? p.likes.length > 0 : false,
-  }));
+  type FetchedPost = (typeof posts)[number];
+  const data: PaginatedPosts = {
+    posts: page.map((p: FetchedPost) => serializePost(p, viewerId)),
+    nextCursor,
+  };
 
-  return NextResponse.json<ApiResponse<Post[]>>({ success: true, data });
+  return NextResponse.json<ApiResponse<PaginatedPosts>>({ success: true, data });
 }
 
 const createPostSchema = z.object({
@@ -43,8 +43,7 @@ const createPostSchema = z.object({
   imageUrl: z.string().url().optional(),
 });
 
-// POST /api/posts -> creates a new post
-// This replaces an Express route like: router.post("/posts", authMiddleware, createPost)
+// POST /api/posts -> create a post. 401 if there's no session.
 export async function POST(req: NextRequest) {
   const session = await auth();
   if (!session?.user) {
@@ -67,27 +66,13 @@ export async function POST(req: NextRequest) {
     data: {
       content: parsed.data.content,
       imageUrl: parsed.data.imageUrl,
-      authorId: session.user.id,
+      userId: session.user.id,
     },
-    include: {
-      author: { select: { id: true, name: true, profileImage: true, headline: true } },
-    },
+    select: postSelect(session.user.id),
   });
 
   return NextResponse.json<ApiResponse<Post>>(
-    {
-      success: true,
-      data: {
-        id: post.id,
-        content: post.content,
-        imageUrl: post.imageUrl,
-        createdAt: post.createdAt.toISOString(),
-        author: post.author,
-        likesCount: 0,
-        commentsCount: 0,
-        isLikedByViewer: false,
-      },
-    },
+    { success: true, data: serializePost(post, session.user.id) },
     { status: 201 }
   );
 }
