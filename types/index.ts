@@ -14,6 +14,7 @@ export interface UserProfile {
   followingCount: number;
   postsCount: number;
   isFollowedByViewer?: boolean;
+  isFollowing: boolean;
 }
 
 export interface PostAuthor {

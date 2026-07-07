@@ -4,6 +4,7 @@ import { postSelect, serializePost } from "@/lib/posts";
 import { Feed } from "@/components/post/feed";
 import { CreatePost } from "@/components/post/create-post";
 import type { PaginatedPosts } from "@/types";
+import { UserMenu } from "@/components/layout/user-menu";
 
 const PAGE_SIZE = 10;
 
@@ -41,7 +42,10 @@ export default async function FeedPage() {
 
   return (
     <main className="mx-auto max-w-2xl px-4 py-6">
-      <h1 className="mb-4 text-xl font-bold">Feed</h1>
+      <div className="mb-4 flex items-center justify-between">
+        <h1 className="text-xl font-bold">Feed</h1>
+        <UserMenu />
+      </div>
       <CreatePost />
       <Feed initialData={initialData} />
     </main>

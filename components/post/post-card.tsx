@@ -9,6 +9,7 @@ import { timeAgo } from "@/lib/utils";
 import { fetcher } from "@/lib/fetcher";
 import { Button } from "@/components/ui/button";
 import { CommentItem } from "@/components/post/comment-item";
+import Link from "next/link";
 
 // CLIENT COMPONENT.
 // This needs onClick handlers (like button, comment submit, delete) and
@@ -104,7 +105,7 @@ export function PostCard({ post, onMutate }: { post: Post; onMutate: () => void 
         <div className="flex-1">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-1 text-sm">
-              <span className="font-semibold">{post.author.name}</span>
+              <Link href={`/profile/${post.author.id}`} className="font-semibold hover:underline">{post.author.name}</Link>
               <span className="text-muted">· {timeAgo(post.createdAt)}</span>
             </div>
             {isOwner && (

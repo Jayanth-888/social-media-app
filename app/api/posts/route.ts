@@ -7,19 +7,36 @@ import type { ApiResponse, Post, PaginatedPosts } from "@/types";
 
 const PAGE_SIZE = 10;
 
-// GET /api/posts?cursor=<postId> -> cursor-paginated feed, newest first.
-// Cursor pagination (rather than ?page=N/offset) stays correct even as new
-// posts are inserted between requests, and scales better than OFFSET on a
-// large table since Postgres can seek directly from the indexed createdAt/id
-// instead of counting through skipped rows.
+// GET /api/posts -> explore feed, newest first.
+// GET /api/posts?feed=following -> posts from users I follow + myself.
+// GET /api/posts?cursor=<postId> -> next page for either feed.
 export async function GET(req: NextRequest) {
   const session = await auth();
   const viewerId = session?.user?.id ?? null;
 
   const cursor = req.nextUrl.searchParams.get("cursor");
+  const feed = req.nextUrl.searchParams.get("feed");
+
+  const where =
+    feed === "following" && viewerId
+      ? {
+          userId: {
+            in: [
+              viewerId,
+              ...(await db.follow
+                .findMany({
+                  where: { followerId: viewerId },
+                  select: { followingId: true },
+                })
+                .then((rows) => rows.map((row) => row.followingId))),
+            ],
+          },
+        }
+      : {};
 
   const posts = await db.post.findMany({
-    take: PAGE_SIZE + 1, // fetch one extra to know if there's a next page
+    where,
+    take: PAGE_SIZE + 1,
     ...(cursor ? { skip: 1, cursor: { id: cursor } } : {}),
     orderBy: { createdAt: "desc" },
     select: postSelect(viewerId),
@@ -30,12 +47,16 @@ export async function GET(req: NextRequest) {
   const nextCursor = hasMore ? page[page.length - 1].id : null;
 
   type FetchedPost = (typeof posts)[number];
+
   const data: PaginatedPosts = {
     posts: page.map((p: FetchedPost) => serializePost(p, viewerId)),
     nextCursor,
   };
 
-  return NextResponse.json<ApiResponse<PaginatedPosts>>({ success: true, data });
+  return NextResponse.json<ApiResponse<PaginatedPosts>>({
+    success: true,
+    data,
+  });
 }
 
 const createPostSchema = z.object({
@@ -46,6 +67,7 @@ const createPostSchema = z.object({
 // POST /api/posts -> create a post. 401 if there's no session.
 export async function POST(req: NextRequest) {
   const session = await auth();
+
   if (!session?.user) {
     return NextResponse.json<ApiResponse<null>>(
       { success: false, error: "Unauthorized" },
@@ -55,9 +77,13 @@ export async function POST(req: NextRequest) {
 
   const body = await req.json();
   const parsed = createPostSchema.safeParse(body);
+
   if (!parsed.success) {
     return NextResponse.json<ApiResponse<null>>(
-      { success: false, error: parsed.error.issues[0]?.message ?? "Invalid input" },
+      {
+        success: false,
+        error: parsed.error.issues[0]?.message ?? "Invalid input",
+      },
       { status: 400 }
     );
   }
@@ -72,7 +98,10 @@ export async function POST(req: NextRequest) {
   });
 
   return NextResponse.json<ApiResponse<Post>>(
-    { success: true, data: serializePost(post, session.user.id) },
+    {
+      success: true,
+      data: serializePost(post, session.user.id),
+    },
     { status: 201 }
   );
 }
