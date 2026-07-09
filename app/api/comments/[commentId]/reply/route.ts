@@ -4,6 +4,7 @@ import { auth } from "@/auth";
 import { db } from "@/lib/db";
 import { commentSelect, serializeComment } from "@/lib/comments";
 import type { ApiResponse, Comment } from "@/types";
+import { createAndEmitNotification } from "@/lib/notify";
 
 interface RouteParams {
   params: { commentId: string };
@@ -56,8 +57,26 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
       userId: session.user.id,
       parentId: effectiveParentId,
     },
-    select: commentSelect(session.user.id, false),
+    select: commentSelect(session.user.id),
   });
+
+  // Notify whoever wrote the top-level comment being replied to. We look
+  // this up via effectiveParentId (not `target`) so that replying to a
+  // reply correctly notifies the top-level comment's author — the same
+  // person the reply actually threads under.
+  const parentComment = await db.comment.findUnique({
+    where: { id: effectiveParentId },
+    select: { userId: true },
+  });
+
+  if (parentComment && parentComment.userId !== session.user.id) {
+    await createAndEmitNotification({
+      userId: parentComment.userId, // the top-level comment's author
+      fromUserId: session.user.id, // whoever wrote the reply
+      type: "COMMENT",
+      postId: target.postId,
+    });
+  }
 
   const data: Comment = serializeComment(reply, session.user.id);
   return NextResponse.json<ApiResponse<Comment>>({ success: true, data }, { status: 201 });

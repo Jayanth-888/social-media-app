@@ -2,6 +2,7 @@ import NextAuth from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
 import { db } from "@/lib/db";
+import { authConfig } from "@/auth.config";
 
 // Auth.js v5 config lives at the project root (not in /lib) by convention,
 // because middleware.ts needs to import from it and root-level imports
@@ -10,6 +11,7 @@ import { db } from "@/lib/db";
 // `getServerSession` AND the old `withAuth` middleware helper),
 // and `signIn` / `signOut` (server actions you can call from forms).
 export const { handlers, auth, signIn, signOut } = NextAuth({
+  ...authConfig, 
   session: {
     strategy: "jwt", // stateless — no Session table needed, works well on Vercel's edge/serverless functions
   },

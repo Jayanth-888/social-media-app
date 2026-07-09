@@ -71,3 +71,31 @@ export interface ApiResponse<T> {
   data?: T;
   error?: string;
 }
+
+export type NotificationType = "FOLLOW" | "LIKE" | "COMMENT";
+
+export interface NotificationUser {
+  id: string;
+  name: string;
+  profileImage: string | null;
+}
+
+export interface NotificationPost {
+  id: string;
+  content: string;
+}
+
+export interface AppNotification {
+  id: string;
+  type: NotificationType;
+  read: boolean;
+  createdAt: string;
+  fromUser: NotificationUser;
+  post: NotificationPost | null;
+}
+
+export interface PaginatedNotifications {
+  items: AppNotification[];
+  nextCursor: string | null;
+  unreadCount: number;
+}

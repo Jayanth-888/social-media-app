@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
 import type { ApiResponse } from "@/types";
+import { createAndEmitNotification } from "@/lib/notify";
 
 interface RouteParams {
   params: { id: string };
@@ -23,7 +24,20 @@ export async function POST(_req: NextRequest, { params }: RouteParams) {
   const userId = session.user.id;
   const postId = params.id;
 
-  const post = await db.post.findUnique({ where: { id: postId }, select: { id: true } });
+  const post = await db.post.findUnique({
+    where: { id: postId },
+    select: { id: true, userId: true },
+  });
+
+  if (post) {
+  await createAndEmitNotification({
+    userId: post.userId,          // the post's author
+    fromUserId: session.user.id,  // whoever liked it
+    type: "LIKE",
+    postId: params.id,
+   });
+  }
+
   if (!post) {
     return NextResponse.json<ApiResponse<null>>(
       { success: false, error: "Post not found" },
@@ -36,6 +50,7 @@ export async function POST(_req: NextRequest, { params }: RouteParams) {
   });
 
   if (existing) {
+    // Unlike
     await db.like.delete({ where: { id: existing.id } });
     return NextResponse.json<ApiResponse<{ liked: boolean }>>({
       success: true,
@@ -43,7 +58,19 @@ export async function POST(_req: NextRequest, { params }: RouteParams) {
     });
   }
 
+  // Like
   await db.like.create({ data: { postId, userId } });
+
+  // Notify the post author
+  if (post.userId !== userId) {
+    await createAndEmitNotification({
+      userId: post.userId, // the post's author
+      fromUserId: userId, // whoever liked it
+      type: "LIKE",
+      postId: postId,
+    });
+  }
+
   return NextResponse.json<ApiResponse<{ liked: boolean }>>({
     success: true,
     data: { liked: true },

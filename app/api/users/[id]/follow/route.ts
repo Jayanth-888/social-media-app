@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
 import type { ApiResponse } from "@/types";
+import { createAndEmitNotification } from "@/lib/notify";
 
 interface RouteParams {
   params: { id: string };
@@ -62,6 +63,12 @@ export async function POST(_req: NextRequest, { params }: RouteParams) {
       followerId,
       followingId,
     },
+  });
+
+  await createAndEmitNotification({
+  userId: params.id,          // the user being followed
+  fromUserId: session.user.id, // whoever clicked follow
+  type: "FOLLOW",
   });
 
   return NextResponse.json<ApiResponse<{ following: boolean }>>({

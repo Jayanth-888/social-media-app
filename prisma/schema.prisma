@@ -11,47 +11,45 @@ datasource db {
 }
 
 // users(id, name, email, password, bio, headline, profile_image, created_at)
-//
-// NOTE: We are using the JWT session strategy with a Credentials-only
-// provider, so no NextAuth Adapter is required — that means we don't need
-// the Account / Session / VerificationToken tables an OAuth or
-// database-session setup would require. The JWT itself carries the
-// session, so Postgres only stores what the app actually needs.
 model User {
   id           String   @id @default(cuid())
   name         String?
   email        String   @unique
-  password     String // bcrypt hash — never store or return plaintext
+  password     String
   bio          String?
-  headline     String? // e.g. "Software Engineer @ Company" — LinkedIn-style
+  headline     String?
   profileImage String?  @map("profile_image")
   createdAt    DateTime @default(now()) @map("created_at")
 
-  posts    Post[]
-  comments Comment[]
-  likes    Like[]
+  posts        Post[]
+  comments     Comment[]
+  likes        Like[]
   commentLikes CommentLike[]
 
   followedBy Follow[] @relation("following")
   following  Follow[] @relation("follower")
 
+  notificationsReceived Notification[] @relation("notificationsReceived")
+  notificationsSent     Notification[] @relation("notificationsSent")
+
   @@map("users")
 }
 
 model Post {
-  id        String    @id @default(cuid())
+  id        String   @id @default(cuid())
   content   String
   imageUrl  String?
   userId    String
-  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  comments Comment[]
-  likes    Like[]
+  comments      Comment[]
+  likes         Like[]
+  notifications Notification[]
 
   @@index([userId])
-  @@index([createdAt]) // supports ORDER BY createdAt DESC for the cursor feed
+  @@index([createdAt])
   @@map("posts")
 }
 
@@ -64,10 +62,6 @@ model Comment {
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   createdAt DateTime @default(now())
 
-  // Self-relation for replies. Kept one level deep at the API layer (a
-  // reply's parentId always points at a top-level comment, never at
-  // another reply) so the UI only ever has to render comment -> replies,
-  // never arbitrarily nested threads.
   parentId String?
   parent   Comment?  @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
   replies  Comment[] @relation("CommentReplies")
@@ -80,24 +74,28 @@ model Comment {
 }
 
 model CommentLike {
-  id        String  @id @default(cuid())
+  id        String   @id @default(cuid())
   commentId String
-  comment   Comment @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  comment   Comment  @relation(fields: [commentId], references: [id], onDelete: Cascade)
   userId    String
-  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
 
   @@unique([commentId, userId])
+  @@index([userId])
   @@map("comment_likes")
 }
 
 model Like {
-  id     String @id @default(cuid())
-  postId String
-  post   Post   @relation(fields: [postId], references: [id], onDelete: Cascade)
-  userId String
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id        String   @id @default(cuid())
+  postId    String
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
 
   @@unique([postId, userId])
+  @@index([userId])
   @@map("likes")
 }
 
@@ -112,4 +110,29 @@ model Follow {
   @@index([followerId])
   @@index([followingId])
   @@map("follows")
+}
+
+model Notification {
+  id         String           @id @default(cuid())
+  userId     String
+  user       User             @relation("notificationsReceived", fields: [userId], references: [id], onDelete: Cascade)
+  fromUserId String
+  fromUser   User             @relation("notificationsSent", fields: [fromUserId], references: [id], onDelete: Cascade)
+  type       NotificationType
+  postId     String?
+  post       Post?            @relation(fields: [postId], references: [id], onDelete: Cascade)
+  read       Boolean          @default(false)
+  createdAt  DateTime         @default(now())
+
+  @@index([userId, read])
+  @@index([userId, createdAt])
+  @@index([fromUserId])
+  @@index([postId])
+  @@map("notifications")
+}
+
+enum NotificationType {
+  FOLLOW
+  LIKE
+  COMMENT
 }

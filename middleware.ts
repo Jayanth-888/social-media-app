@@ -1,6 +1,14 @@
-import { auth } from "@/auth";
+import NextAuth from "next-auth";
 import { NextResponse, type NextRequest } from "next/server";
 import type { Session } from "next-auth";
+import { authConfig } from "@/auth.config";
+
+// Build a separate, Edge-safe NextAuth instance from authConfig (which
+// has no Credentials provider, so no bcrypt/Prisma gets bundled here).
+// This `auth` is only used for reading the session in middleware — your
+// real auth.ts + its Credentials provider are untouched and still used
+// everywhere else (API routes, Server Components, etc).
+const { auth } = NextAuth(authConfig);
 
 // In Auth.js v5, `auth` doubles as the middleware function itself — wrap
 // your logic in it and it injects `req.auth` (the session, or null).
