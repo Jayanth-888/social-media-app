@@ -34,6 +34,7 @@ interface SocketContextValue {
   socket: Socket | null;
   notifications: AppNotification[];
   unreadCount: number;
+  // eslint-disable-next-line no-unused-vars
   markAsRead: (id: string) => void;
 }
 
