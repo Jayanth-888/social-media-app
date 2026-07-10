@@ -120,6 +120,18 @@ export function PostCard({ post, onMutate }: { post: Post; onMutate: () => void 
           </div>
           <p className="mt-1 whitespace-pre-wrap text-[15px]">{post.content}</p>
 
+          {post.imageUrl && (
+            <div className="relative mt-3 aspect-video w-full overflow-hidden rounded-lg border border-border">
+              <Image
+                src={post.imageUrl}
+                alt=""
+                fill
+                className="object-cover"
+                sizes="(max-width: 640px) 100vw, 600px"
+              />
+            </div>
+          )}
+
           <div className="mt-2 flex gap-6 text-sm text-muted">
             <button onClick={() => setShowComments((v) => !v)} className="hover:text-foreground">
               💬 {post.commentsCount}

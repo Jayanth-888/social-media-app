@@ -37,6 +37,8 @@ export default async function ProfilePage({ params }: ProfilePageProps) {
 
   if (!user) notFound();
 
+  const isOwnProfile = viewerId === user.id;
+
   const follow = viewerId
     ? await db.follow.findUnique({
         where: {
@@ -72,7 +74,17 @@ export default async function ProfilePage({ params }: ProfilePageProps) {
         />
 
         <div className="flex-1">
-          <h1 className="text-2xl font-bold">{user.name ?? "Unnamed user"}</h1>
+          <div className="flex items-start justify-between">
+            <h1 className="text-2xl font-bold">{user.name ?? "Unnamed user"}</h1>
+            {isOwnProfile && (
+              <Link
+                href="/profile/edit"
+                className="rounded-full border border-border px-4 py-1.5 text-sm font-semibold hover:bg-gray-50"
+              >
+                Edit profile
+              </Link>
+            )}
+          </div>
           {user.headline && <p className="text-sm text-muted">{user.headline}</p>}
           {user.bio && <p className="mt-3 text-sm">{user.bio}</p>}
 
@@ -87,7 +99,7 @@ export default async function ProfilePage({ params }: ProfilePageProps) {
               userId={user.id}
               initialIsFollowing={Boolean(follow)}
               initialFollowersCount={user._count.followedBy}
-              isOwnProfile={viewerId === user.id}
+              isOwnProfile={isOwnProfile}
             />
           </div>
         </div>
