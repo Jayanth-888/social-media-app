@@ -1,17 +1,17 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import useSWRInfinite from "swr/infinite";
 import { fetcher } from "@/lib/fetcher";
 import { PostCard } from "@/components/post/post-card";
 import { Button } from "@/components/ui/button";
+import { useIntersectionObserver } from "@/hooks/useIntersectionObserver";
 import type { PaginatedPosts } from "@/types";
 
 type FeedMode = "explore" | "following";
 
 export function Feed({ initialData }: { initialData: PaginatedPosts }) {
   const [mode, setMode] = useState<FeedMode>("explore");
-
 
   const { data, size, setSize, isValidating, mutate } = useSWRInfinite<PaginatedPosts>(
     (pageIndex, previousPageData: PaginatedPosts | null) => {
@@ -37,6 +37,18 @@ export function Feed({ initialData }: { initialData: PaginatedPosts }) {
   const posts = pages.flatMap((page) => page.posts);
   const lastPage = pages[pages.length - 1];
   const hasMore = lastPage?.nextCursor !== null && pages.length > 0;
+
+  // Functional update so this callback's identity doesn't need to change
+  // every time `size` changes — keeps the IntersectionObserver from being
+  // torn down and recreated on every page load.
+  const loadNextPage = useCallback(() => {
+    setSize((currentSize) => currentSize + 1);
+  }, [setSize]);
+
+  const sentinelRef = useIntersectionObserver({
+    onIntersect: loadNextPage,
+    enabled: hasMore && !isValidating,
+  });
 
   return (
     <div>
@@ -67,12 +79,13 @@ export function Feed({ initialData }: { initialData: PaginatedPosts }) {
         </p>
       )}
 
-      {hasMore && (
-        <div className="mt-4 flex justify-center">
-          <Button variant="secondary" disabled={isValidating} onClick={() => setSize(size + 1)}>
-            {isValidating ? "Loading..." : "Load more"}
-          </Button>
-        </div>
+      {/* Sentinel: triggers loadNextPage via IntersectionObserver as it
+          scrolls into view, ~200px before it's actually visible (see
+          rootMargin default in useIntersectionObserver). */}
+      {hasMore && <div ref={sentinelRef} className="h-10" />}
+
+      {isValidating && posts.length > 0 && (
+        <p className="py-4 text-center text-sm text-muted">Loading more...</p>
       )}
     </div>
   );

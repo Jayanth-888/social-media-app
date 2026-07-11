@@ -3,6 +3,7 @@ import CredentialsProvider from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
 import { db } from "@/lib/db";
 import { authConfig } from "@/auth.config";
+import { authRateLimit } from "@/lib/rate-limit";
 
 // Auth.js v5 config lives at the project root (not in /lib) by convention,
 // because middleware.ts needs to import from it and root-level imports
@@ -25,11 +26,30 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         email: { label: "Email", type: "email" },
         password: { label: "Password", type: "password" },
       },
+      // Auth.js v5 passes the raw Request as the second argument to
+      // authorize — that's how we get an IP without a route handler.
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) return null;
 
+        const email = credentials.email as string;
+
+        // Keyed by email, not IP: this directly stops brute-forcing a
+        // single known account (the realistic threat here), and doesn't
+        // accidentally lock out a whole office/NAT sharing one IP.
+        // Fail OPEN on a rate-limiter error: a Redis outage should
+        // degrade to "no rate limiting" rather than "nobody can log in."
+        try {
+          const { success: withinLimit } = await authRateLimit.limit(`login:${email}`);
+          if (!withinLimit) {
+            console.warn(`Rate limit hit for login attempt: ${email}`);
+            return null; // Auth.js surfaces this as a generic invalid-credentials error
+          }
+        } catch (err) {
+          console.error("Rate limiter check failed, allowing login attempt:", err);
+        }
+
         const user = await db.user.findUnique({
-          where: { email: credentials.email as string },
+          where: { email },
         });
         if (!user) return null;
 

@@ -5,9 +5,21 @@ import { db } from "@/lib/db";
 import { commentWithRepliesSelect, serializeComment } from "@/lib/comments";
 import type { ApiResponse, Comment } from "@/types";
 import { createAndEmitNotification } from "@/lib/notify";
+import { bumpFeedVersion } from "@/lib/feed-cache";
 
 interface RouteParams {
   params: { id: string };
+}
+
+// Never let a Redis hiccup take down the actual comment action — worst
+// case on failure is a stale feed cache for up to 60s, which is far
+// preferable to the request itself failing.
+async function safelyBumpFeedVersion(): Promise<void> {
+  try {
+    await bumpFeedVersion();
+  } catch (err) {
+    console.error("Failed to bump feed cache version:", err);
+  }
 }
 
 // GET /api/posts/[id]/comment -> top-level comments for this post, oldest
@@ -42,10 +54,10 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
 
   const postId = params.id;
   const post = await db.post.findUnique({
-    where: { id: postId},
+    where: { id: postId },
     select: { id: true, userId: true },
   });
-  
+
   if (!post) {
     return NextResponse.json<ApiResponse<null>>(
       { success: false, error: "Post not found" },
@@ -70,6 +82,8 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
     },
     select: commentWithRepliesSelect(session.user.id),
   });
+
+  await safelyBumpFeedVersion(); // commentsCount changed — cached feed pages are now stale
 
   // Notify the post author
   if (post.userId !== session.user.id) {

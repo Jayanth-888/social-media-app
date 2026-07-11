@@ -39,6 +39,26 @@ export async function DELETE(_req: NextRequest, { params }: RouteParams) {
     );
   }
 
-  await db.post.delete({ where: { id: params.id } });
-  return NextResponse.json<ApiResponse<null>>({ success: true });
+  try {
+    // Delete dependent rows first, in dependency order, inside one
+    // transaction — this works whether or not onDelete: Cascade is set
+    // on the schema (a harmless no-op if it already is), and avoids the
+    // foreign key violation from deleting a post that still has
+    // comments/likes/notifications pointing at it.
+    await db.$transaction([
+      db.notification.deleteMany({ where: { postId: params.id } }),
+      db.commentLike.deleteMany({ where: { comment: { postId: params.id } } }),
+      db.like.deleteMany({ where: { postId: params.id } }),
+      db.comment.deleteMany({ where: { postId: params.id } }),
+      db.post.delete({ where: { id: params.id } }),
+    ]);
+
+    return NextResponse.json<ApiResponse<null>>({ success: true });
+  } catch (err) {
+    console.error("Failed to delete post:", err);
+    return NextResponse.json<ApiResponse<null>>(
+      { success: false, error: "Failed to delete post" },
+      { status: 500 }
+    );
+  }
 }

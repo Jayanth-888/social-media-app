@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useSession, signOut } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import { NotificationBell } from "@/components/notifications/notification-bell";
+import { UserSearch } from "@/components/search/user-search";
 
 export function UserMenu() {
   const { data: session, status } = useSession();
@@ -16,6 +17,8 @@ export function UserMenu() {
 
   return (
     <div className="flex items-center gap-3">
+      <UserSearch />
+
       <NotificationBell />
 
       <span className="text-sm text-muted">{session.user.name}</span>

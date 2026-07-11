@@ -3,6 +3,7 @@ import bcrypt from "bcryptjs";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import type { ApiResponse } from "@/types";
+import { authRateLimit } from "@/lib/rate-limit";
 
 // This has no Auth.js equivalent — Credentials provider only ever
 // *verifies* a password at sign-in, it never creates a user. Registration
@@ -16,6 +17,24 @@ const registerSchema = z.object({
 });
 
 export async function POST(req: NextRequest) {
+  // Keyed by IP, not user id — there's no session yet at registration.
+  // This is the front door for brute-force account creation / spam
+  // signups, so it needs its own limit independent of auth.
+  // Fail OPEN on a rate-limiter error: a Redis outage should degrade to
+  // "no rate limiting" rather than "nobody can register."
+  const ip = req.headers.get("x-forwarded-for") ?? "unknown";
+  try {
+    const { success: withinLimit } = await authRateLimit.limit(ip);
+    if (!withinLimit) {
+      return NextResponse.json<ApiResponse<null>>(
+        { success: false, error: "Too many attempts — please try again shortly." },
+        { status: 429 }
+      );
+    }
+  } catch (err) {
+    console.error("Rate limiter check failed, allowing request:", err);
+  }
+
   const body = await req.json();
   const parsed = registerSchema.safeParse(body);
 
