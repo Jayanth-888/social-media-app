@@ -14,10 +14,7 @@ architecture.
 
 ## Project Status
 
-✅ Phase 0 – Project Setup (Completed)
-
-🚧 Currently Working On:
-- Phase 1 – Authentication + Databasegi
+✅ Completed
 
 ## Tech Stack
 
